@@ -1,0 +1,13 @@
+{
+  "name": "identity-access",
+  "version": "1.0.0",
+  "description": "Healthcare Asset Platform - identity-access",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

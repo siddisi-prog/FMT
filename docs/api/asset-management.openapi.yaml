@@ -1,0 +1,387 @@
+openapi: 3.0.3
+info:
+  title: Asset Management Service API
+  description: |
+    REST API for the Healthcare Asset Management Service.
+    Manages the complete lifecycle of healthcare assets including medical devices,
+    facility assets, and IT assets.
+  version: 1.0.0
+  contact:
+    name: Niyas Ahamed
+    email: niyas@example.com
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3001/api/v1
+    description: Local development
+  - url: https://api.healthcare-platform.example.com/asset-management/v1
+    description: Production
+
+tags:
+  - name: Assets
+    description: Asset registry operations
+  - name: WorkOrders
+    description: Maintenance work order operations
+  - name: MaintenancePlans
+    description: Preventive maintenance schedule operations
+  - name: ComplianceRecords
+    description: Regulatory compliance record operations
+
+paths:
+  /assets:
+    get:
+      tags: [Assets]
+      summary: List all assets
+      description: Returns a paginated list of assets. Supports filtering by status, category, location, and department.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, UNDER_MAINTENANCE, DECOMMISSIONED]
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: locationId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Paginated list of assets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Assets]
+      summary: Create a new asset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssetRequest'
+      responses:
+        '201':
+          description: Asset created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /assets/{id}:
+    get:
+      tags: [Assets]
+      summary: Get asset by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Asset details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Assets]
+      summary: Update asset details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAssetRequest'
+      responses:
+        '200':
+          description: Asset updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+
+    delete:
+      tags: [Assets]
+      summary: Decommission an asset
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Asset decommissioned
+
+  /work-orders:
+    post:
+      tags: [WorkOrders]
+      summary: Create a new work order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkOrderRequest'
+      responses:
+        '201':
+          description: Work order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkOrder'
+
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: UP
+                  service:
+                    type: string
+                    example: asset-management
+                  timestamp:
+                    type: string
+                    format: date-time
+
+components:
+  schemas:
+    Asset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        assetTag:
+          type: string
+          example: MED-2024-001
+        name:
+          type: string
+          example: Philips Ingenia 3T MRI
+        categoryId:
+          type: string
+          format: uuid
+        locationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [ACTIVE, UNDER_MAINTENANCE, DECOMMISSIONED]
+        serialNumber:
+          type: string
+        manufacturer:
+          type: string
+        model:
+          type: string
+        purchaseDate:
+          type: string
+          format: date
+        warrantyExpiry:
+          type: string
+          format: date
+        capexOpexTag:
+          type: string
+          enum: [CAPEX, OPEX]
+        residualValue:
+          type: number
+          format: float
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateAssetRequest:
+      type: object
+      required: [name, categoryId, locationId, serialNumber, manufacturer, model, purchaseDate]
+      properties:
+        name:
+          type: string
+        categoryId:
+          type: string
+          format: uuid
+        locationId:
+          type: string
+          format: uuid
+        serialNumber:
+          type: string
+        manufacturer:
+          type: string
+        model:
+          type: string
+        purchaseDate:
+          type: string
+          format: date
+        capexOpexTag:
+          type: string
+          enum: [CAPEX, OPEX]
+
+    UpdateAssetRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        locationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [ACTIVE, UNDER_MAINTENANCE, DECOMMISSIONED]
+
+    AssetListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Asset'
+        meta:
+          type: object
+          properties:
+            total:
+              type: integer
+            page:
+              type: integer
+            limit:
+              type: integer
+
+    WorkOrder:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        assetId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [PREVENTIVE, CORRECTIVE, CALIBRATION, SAFETY_CHECK]
+        status:
+          type: string
+          enum: [OPEN, IN_PROGRESS, COMPLETED, CANCELLED]
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        assignedTechnicianId:
+          type: string
+          format: uuid
+        scheduledDate:
+          type: string
+          format: date-time
+        completedDate:
+          type: string
+          format: date-time
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateWorkOrderRequest:
+      type: object
+      required: [assetId, type, priority, scheduledDate]
+      properties:
+        assetId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [PREVENTIVE, CORRECTIVE, CALIBRATION, SAFETY_CHECK]
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        scheduledDate:
+          type: string
+          format: date-time
+        assignedTechnicianId:
+          type: string
+          format: uuid
+        notes:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Unauthorized
+    BadRequest:
+      description: Invalid request body
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Asset not found
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []

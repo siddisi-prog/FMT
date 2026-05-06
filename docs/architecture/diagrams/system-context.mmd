@@ -1,0 +1,54 @@
+graph TB
+    subgraph "Healthcare Asset Management Platform"
+        WEB["Web App\n(React/TypeScript)"]
+        MOB["Mobile App\n(Flutter)"]
+        GW["API Gateway\n(Kong/Nginx)"]
+        AM["Asset Management\nService :3001"]
+        IG["Integration Gateway\nService :3002"]
+        CP["Capital Planning\nService :3003"]
+        ESG["Sustainability & ESG\nService :3004"]
+        IA["Identity & Access\nService :3005"]
+        RA["Reporting & Analytics\nService :3006"]
+        KAFKA["Apache Kafka\nMessage Bus"]
+        PG["PostgreSQL\n(Primary DB)"]
+        TS["TimescaleDB\n(Time-Series)"]
+        REDIS["Redis\n(Cache)"]
+        KC["Keycloak\n(Identity Provider)"]
+    end
+
+    subgraph "External Systems"
+        SAP["SAP ERP"]
+        ORC["Oracle ERP"]
+        DYN["MS Dynamics"]
+        CMMS["Hospital CMMS/HTM"]
+        BMS["BMS/BAS\n(IoT Sensors)"]
+    end
+
+    WEB --> GW
+    MOB --> GW
+    GW --> AM
+    GW --> CP
+    GW --> ESG
+    GW --> RA
+    GW --> IA
+
+    AM --> KAFKA
+    IG --> KAFKA
+    CP --> KAFKA
+    ESG --> KAFKA
+
+    AM --> PG
+    CP --> PG
+    IA --> PG
+    RA --> PG
+    ESG --> PG
+    ESG --> TS
+
+    GW --> REDIS
+    IA --> KC
+
+    IG --> SAP
+    IG --> ORC
+    IG --> DYN
+    IG --> CMMS
+    ESG --> BMS

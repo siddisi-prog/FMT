@@ -1,0 +1,175 @@
+version: '3.8'
+
+# ============================================================
+# Healthcare Asset Management Platform — Local Development Stack
+# ============================================================
+# Usage: cd infra && docker-compose up -d
+# ============================================================
+
+services:
+
+  # ---- Infrastructure ----
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: hap-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: healthcare_assets
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: hap-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: hap-zookeeper
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: hap-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    ports:
+      - "9092:9092"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: hap-keycloak
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ---- Microservices ----
+
+  asset-management:
+    build:
+      context: ../services/asset-management
+      dockerfile: Dockerfile
+    container_name: hap-asset-management
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthcare_assets
+      KAFKA_BROKERS: kafka:9092
+      LOG_LEVEL: info
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  integration-gateway:
+    build:
+      context: ../services/integration-gateway
+      dockerfile: Dockerfile
+    container_name: hap-integration-gateway
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthcare_assets
+      KAFKA_BROKERS: kafka:9092
+      LOG_LEVEL: info
+    ports:
+      - "3002:3002"
+    depends_on:
+      - kafka
+
+  capital-planning:
+    build:
+      context: ../services/capital-planning
+      dockerfile: Dockerfile
+    container_name: hap-capital-planning
+    environment:
+      PORT: 3003
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthcare_assets
+      KAFKA_BROKERS: kafka:9092
+      ASSET_SERVICE_URL: http://asset-management:3001
+      DISCOUNT_RATE: "0.07"
+      LOG_LEVEL: info
+    ports:
+      - "3003:3003"
+    depends_on:
+      - asset-management
+
+  sustainability-esg:
+    build:
+      context: ../services/sustainability-esg
+      dockerfile: Dockerfile
+    container_name: hap-sustainability-esg
+    environment:
+      PORT: 3004
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthcare_assets
+      KAFKA_BROKERS: kafka:9092
+      DEFAULT_EMISSION_FACTOR_REGION: GB
+      LOG_LEVEL: info
+    ports:
+      - "3004:3004"
+    depends_on:
+      - kafka
+
+  identity-access:
+    build:
+      context: ../services/identity-access
+      dockerfile: Dockerfile
+    container_name: hap-identity-access
+    environment:
+      PORT: 3005
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthcare_assets
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: healthcare-platform
+      JWT_EXPIRY: "3600"
+      LOG_LEVEL: info
+    ports:
+      - "3005:3005"
+    depends_on:
+      - keycloak
+
+  reporting-analytics:
+    build:
+      context: ../services/reporting-analytics
+      dockerfile: Dockerfile
+    container_name: hap-reporting-analytics
+    environment:
+      PORT: 3006
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthcare_assets
+      ASSET_SERVICE_URL: http://asset-management:3001
+      CAPITAL_SERVICE_URL: http://capital-planning:3003
+      ESG_SERVICE_URL: http://sustainability-esg:3004
+      LOG_LEVEL: info
+    ports:
+      - "3006:3006"
+    depends_on:
+      - asset-management
+      - capital-planning
+      - sustainability-esg
+
+volumes:
+  postgres_data:
+  redis_data:

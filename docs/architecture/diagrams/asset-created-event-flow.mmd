@@ -1,0 +1,30 @@
+sequenceDiagram
+    participant Client as Web/Mobile Client
+    participant GW as API Gateway
+    participant AM as Asset Management
+    participant Kafka as Kafka Bus
+    participant IG as Integration Gateway
+    participant CP as Capital Planning
+    participant RA as Reporting & Analytics
+    participant SAP as SAP ERP
+
+    Client->>GW: POST /api/v1/assets (JWT)
+    GW->>GW: Validate JWT, check RBAC
+    GW->>AM: Forward request
+    AM->>AM: Validate & persist asset
+    AM->>Kafka: Publish AssetCreated event
+    AM-->>GW: 201 Created {assetId}
+    GW-->>Client: 201 Created {assetId}
+
+    Kafka-->>IG: Consume AssetCreated
+    IG->>IG: Map to SAP canonical model
+    IG->>SAP: Create equipment record (EQUI)
+    SAP-->>IG: 200 OK {sapId}
+    IG->>AM: PATCH /assets/{id}/external-ids {sap: sapId}
+
+    Kafka-->>CP: Consume AssetCreated
+    CP->>CP: Register asset for CapEx tracking
+
+    Kafka-->>RA: Consume AssetCreated
+    RA->>RA: Update asset count KPI
+    RA->>RA: Write audit log entry
